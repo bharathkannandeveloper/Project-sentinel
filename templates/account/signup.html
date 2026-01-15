@@ -1,0 +1,79 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% load account socialaccount %}
+
+{% block title %}Sign Up - Sentinel{% endblock %}
+
+{% block content %}
+<div style="min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 2rem 0;">
+    <div class="card" style="width: 100%; max-width: 450px; padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="font-size: 2rem; font-weight: 700; color: #6366f1;">Create Account</h1>
+            <p style="color: #94a3b8;">Join Sentinel - Financial Analysis Platform</p>
+        </div>
+
+        {% get_providers as socialaccount_providers %}
+        {% if socialaccount_providers %}
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+            {% for provider in socialaccount_providers %}
+            <a href="{% provider_login_url provider.id %}" class="btn"
+                style="background: #1a1a24; border: 1px solid #2a2a3a; width: 100%; justify-content: center; text-decoration: none; color: white; padding: 0.75rem; border-radius: 8px; display: flex; align-items: center;">
+                <span style="margin-right: 0.5rem;">🔐</span> Sign up with {{ provider.name }}
+            </a>
+            {% endfor %}
+        </div>
+        <div style="text-align: center; margin-bottom: 1.5rem; color: #64748b;">— OR —</div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'account_signup' %}">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div
+                style="background: rgba(239,68,68,0.1); border: 1px solid #ef4444; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; color: #ef4444;">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #94a3b8;">Email</label>
+                <input type="email" name="email" placeholder="you@example.com" required
+                    style="width: 100%; padding: 0.75rem; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; color: white;">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #94a3b8;">Full Name</label>
+                <input type="text" name="full_name" placeholder="John Doe"
+                    style="width: 100%; padding: 0.75rem; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; color: white;">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #94a3b8;">Phone Number</label>
+                <input type="text" name="phone_number" placeholder="+91 99999 99999"
+                    style="width: 100%; padding: 0.75rem; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; color: white;">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #94a3b8;">Password</label>
+                <input type="password" name="password1" placeholder="Enter password" required
+                    style="width: 100%; padding: 0.75rem; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; color: white;">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #94a3b8;">Confirm Password</label>
+                <input type="password" name="password2" placeholder="Confirm password" required
+                    style="width: 100%; padding: 0.75rem; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; color: white;">
+            </div>
+
+            <button type="submit" class="btn btn-primary"
+                style="width: 100%; padding: 0.875rem; background: #6366f1; border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer;">Sign
+                Up</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; color: #64748b;">
+            Already have an account? <a href="{% url 'account_login' %}"
+                style="color: #6366f1; text-decoration: none;">Log In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div style="margin-bottom: 2rem; text-align: center;">
+        <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">
+            🤖 Sentinel AI Chat
+        </h1>
+        <p style="color: var(--text-secondary);">Your Anand Srinivasan-style financial advisor</p>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="card" style="height: 70vh; display: flex; flex-direction: column;">
+        <!-- Chat Messages -->
+        <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 1rem;">
+            <div class="chat-message bot"
+                style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 1rem; border-radius: 12px; margin-bottom: 1rem;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem;">🤖 Sentinel</div>
+                <div>Vanakkam! 🙏 I'm your financial advisor with a twist - I'll tell you the truth even if it hurts!
+
+                    Ask me about any stock: "What do you think about INFY?" or "Is RELIANCE a good buy?"
+
+                    I analyze using Pattaasu criteria:
+                    • Debt-to-Equity < 1.0 • Zero promoter pledging • 3 years positive free cash flow Let's see if your
+                        stock picks make sense or if they're just "my friend told me" picks! 😄</div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div style="padding: 1rem; border-top: 1px solid var(--border);">
+                <form id="chat-form" style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="chat-input" placeholder="Ask about any stock... (INFY, TCS, AAPL, etc.)"
+                        style="flex: 1; padding: 1rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; color: var(--text-primary); font-size: 1rem;"
+                        autocomplete="off">
+                    <button type="submit" class="btn btn-primary" style="padding: 1rem 2rem;">
+                        Send
+                    </button>
+                </form>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                    <button class="btn btn-ghost" onclick="sendQuick('What about INFY?')"
+                        style="font-size: 0.75rem;">INFY</button>
+                    <button class="btn btn-ghost" onclick="sendQuick('Analyze TCS')"
+                        style="font-size: 0.75rem;">TCS</button>
+                    <button class="btn btn-ghost" onclick="sendQuick('Is RELIANCE good?')"
+                        style="font-size: 0.75rem;">RELIANCE</button>
+                    <button class="btn btn-ghost" onclick="sendQuick('AAPL analysis')"
+                        style="font-size: 0.75rem;">AAPL</button>
+                    <button class="btn btn-ghost" onclick="sendQuick('What is Pattaasu?')"
+                        style="font-size: 0.75rem;">Pattaasu?</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="/" class="btn btn-ghost">← Back to Dashboard</a>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block extra_js %}
+    <script>
+        const messagesContainer = document.getElementById('chat-messages');
+
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.marginBottom = '1rem';
+
+            if (isUser) {
+                messageDiv.innerHTML = `
+                <div style="text-align: right;">
+                    <div style="display: inline-block; background: var(--primary); color: white; padding: 0.75rem 1rem; border-radius: 12px; max-width: 80%;">
+                        ${content}
+                    </div>
+                </div>
+            `;
+            } else {
+                messageDiv.innerHTML = `
+                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 12px; max-width: 90%;">
+                    <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.25rem;">🤖 Sentinel</div>
+                    <div style="white-space: pre-wrap;">${content}</div>
+                </div>
+            `;
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function sendMessage(message) {
+            if (!message.trim()) return;
+
+            addMessage(message, true);
+
+            // Show typing indicator
+            const typingId = 'typing-' + Date.now();
+            const typingDiv = document.createElement('div');
+            typingDiv.id = typingId;
+            typingDiv.innerHTML = `<div style="color: var(--text-muted); padding: 0.5rem;">Sentinel is thinking... 🤔</div>`;
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            try {
+                // Check if message mentions a stock - trigger full analysis
+                const stockMatch = message.match(/\b(INFY|TCS|RELIANCE|HDFCBANK|ICICIBANK|SBIN|WIPRO|AAPL|MSFT|GOOGL|AMZN|NVDA|META)\b/i);
+
+                let response;
+                if (stockMatch) {
+                    // Full analysis with AI commentary
+                    response = await fetch('/api/v2/analyze/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: stockMatch[1].toUpperCase() })
+                    });
+                } else {
+                    // Regular chat
+                    response = await fetch('/api/v2/chat/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message })
+                    });
+                }
+
+                const data = await response.json();
+
+                // Remove typing indicator
+                document.getElementById(typingId)?.remove();
+
+                if (stockMatch && data.success) {
+                    // Show analysis result
+                    const analysis = data.analysis || {};
+                    const d = data.data || {};
+                    const rating = analysis.rating || 'HOLD';
+                    const ratingEmoji = {
+                        'STRONG BUY': '🚀',
+                        'BUY': '✅',
+                        'HOLD': '⏸️',
+                        'SELL': '⚠️',
+                        'STRONG SELL': '🚨'
+                    }[rating] || '📊';
+
+                    let analysisText = `${ratingEmoji} **${data.ticker}** - ${rating}\n\n`;
+                    analysisText += `Company: ${d.company_name || data.ticker}\n`;
+                    analysisText += `Sector: ${d.sector || 'N/A'}\n`;
+                    analysisText += `Fundamental Score: ${analysis.fundamental_score || 0}/100\n`;
+                    analysisText += `Pattaasu: ${analysis.pattaasu_compliant ? '✅ Compliant' : '❌ Not Compliant'}\n\n`;
+
+                    if (data.ai_commentary) {
+                        analysisText += `${data.ai_commentary}`;
+                    }
+
+                    addMessage(analysisText);
+                } else {
+                    addMessage(data.response || data.ai_commentary || data.error || 'Something went wrong!');
+                }
+            } catch (error) {
+                document.getElementById(typingId)?.remove();
+                addMessage('Oops! Network error. Please try again.');
+            }
+        }
+
+        function sendQuick(message) {
+            document.getElementById('chat-input').value = message;
+            sendMessage(message);
+            document.getElementById('chat-input').value = '';
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const message = input.value;
+            input.value = '';
+            await sendMessage(message);
+        });
+    </script>
+    {% endblock %}

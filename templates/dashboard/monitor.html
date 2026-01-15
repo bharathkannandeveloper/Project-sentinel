@@ -1,0 +1,314 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Results Monitor - Project Sentinel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Live Market Monitor</h2>
+        <div class="status-badge" id="ws-status" style="background: var(--warning);">
+            <div class="status-dot"></div>
+            <span id="ws-status-text">Connecting...</span>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-4" style="margin-bottom: 2rem;">
+        <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px;">
+            <div style="color: var(--text-muted); font-size: 0.875rem;">Stocks Tracked</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="stocks-tracked">0</div>
+        </div>
+        <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px;">
+            <div style="color: var(--text-muted); font-size: 0.875rem;">Market Status</div>
+            <div style="font-size: 1rem; font-weight: 600;" id="market-status-text">Checking...</div>
+        </div>
+        <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px;">
+            <div style="color: var(--text-muted); font-size: 0.875rem;">Updates/Sec</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="updates-sec">0</div>
+        </div>
+        <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px;">
+            <div style="color: var(--text-muted); font-size: 0.875rem;">AI Analyst</div>
+            <div style="font-size: 1rem; font-weight: 600; color: var(--accent-secondary);">Active</div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+        <input type="text" id="add-ticker" placeholder="Add Ticker (e.g. INFY)"
+            style="background: var(--bg-tertiary); border: 1px solid var(--border); color: white; padding: 0.5rem 1rem; border-radius: 6px; outline: none;">
+        <button class="btn btn-primary" onclick="addTicker()">+ Add Watchlist</button>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.75rem; color: var(--text-muted); font-weight: 500;">Symbol</th>
+                <th style="text-align: right; padding: 0.75rem; color: var(--text-muted); font-weight: 500;">Price</th>
+                <th style="text-align: right; padding: 0.75rem; color: var(--text-muted); font-weight: 500;">Change</th>
+                <th style="text-align: right; padding: 0.75rem; color: var(--text-muted); font-weight: 500;">Volume</th>
+                <th style="text-align: center; padding: 0.75rem; color: var(--text-muted); font-weight: 500;">Actions
+                </th>
+            </tr>
+        </thead>
+        <tbody id="watchlist-body">
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    Loading watchlist...
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- LLM Settings -->
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title">LLM Configuration</h2>
+        <button onclick="saveLLMConfig()" class="btn btn-primary" style="font-size: 0.875rem;">Save Config</button>
+    </div>
+
+    <div class="grid grid-3" style="gap: 1rem;">
+        <div>
+            <label
+                style="display: block; color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.875rem;">Provider</label>
+            <select id="llm-provider" onchange="loadModels()"
+                style="width: 100%; padding: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                <option value="groq" selected>Groq (Fast)</option>
+                <option value="ollama">Ollama (Local)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="gemini">Google Gemini</option>
+            </select>
+        </div>
+        <div>
+            <label
+                style="display: block; color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.875rem;">Model</label>
+            <select id="llm-model"
+                style="width: 100%; padding: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+        <div>
+            <label
+                style="display: block; color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.875rem;">Mode</label>
+            <select id="analysis-mode"
+                style="width: 100%; padding: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                <option value="fast">Fast</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="thorough">Deep Research</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="config-msg" style="margin-top: 1rem; font-size: 0.875rem; min-height: 1.5rem;"></div>
+
+    <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.75rem;">
+        💡 API keys are configured in <code>.env</code>.
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let watchlist = ['INFY', 'RELIANCE', 'TCS'];
+    let pollInterval = null;
+
+    function startMonitor() {
+        const stored = localStorage.getItem('sentinel_watchlist');
+        if (stored) {
+            try { watchlist = JSON.parse(stored); } catch (e) { }
+        }
+        updateWatchlistUI();
+        startPolling();
+        loadModels();
+    }
+
+    function startPolling() {
+        document.getElementById('ws-status').style.background = 'var(--success)';
+        document.getElementById('ws-status-text').textContent = 'Live (Polling)';
+
+        fetchQuotes();
+        pollInterval = setInterval(fetchQuotes, 5000);
+    }
+
+    async function fetchQuotes() {
+        if (watchlist.length === 0) {
+            renderTable([]);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/monitor/quotes/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: watchlist })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                renderTable(data.data);
+                document.getElementById('updates-sec').textContent = "0.2";
+            }
+        } catch (error) {
+            console.error("Poll error", error);
+            document.getElementById('ws-status').style.background = 'var(--warning)';
+            document.getElementById('ws-status-text').textContent = 'Reconnecting...';
+        }
+    }
+
+    function saveWatchlist() {
+        localStorage.setItem('sentinel_watchlist', JSON.stringify(watchlist));
+    }
+
+    function addTicker() {
+        const input = document.getElementById('add-ticker');
+        const ticker = input.value.toUpperCase().trim();
+        if (!ticker || watchlist.includes(ticker)) return;
+
+        watchlist.push(ticker);
+        saveWatchlist();
+        updateWatchlistUI();
+        fetchQuotes();
+        input.value = '';
+    }
+
+    function updateWatchlistUI() {
+        document.getElementById('stocks-tracked').textContent = watchlist.length;
+    }
+
+    function renderTable(quotes) {
+        const tbody = document.getElementById('watchlist-body');
+
+        if (!quotes || quotes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted)">Watchlist is empty</td></tr>';
+            return;
+        }
+
+        const quoteMap = {};
+        quotes.forEach(q => quoteMap[q.symbol] = q);
+
+        tbody.innerHTML = watchlist.map(ticker => {
+            const q = quoteMap[ticker] || { price: 0, change: 0, change_percent: 0, volume: 0, sector: 'Loading...' };
+
+            const price = q.price ? `₹${q.price.toLocaleString()}` : '--';
+            const change = q.change ? `${q.change > 0 ? '+' : ''}${q.change}` : '--';
+            const pct = q.change_percent ? `(${q.change_percent}%)` : '';
+            const volume = q.volume ? q.volume.toLocaleString() : '--';
+
+            const color = (q.change || 0) >= 0 ? 'var(--success)' : 'var(--danger)';
+
+            return `
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.75rem; font-weight: 600;">
+                    ${ticker} <span style="font-size:0.75em; color:var(--text-muted)">${q.sector || ''}</span>
+                </td>
+                <td style="text-align: right; padding: 0.75rem;">${price}</td>
+                <td style="text-align: right; padding: 0.75rem; color: ${color};">
+                    ${change} ${pct}
+                </td>
+                <td style="text-align: right; padding: 0.75rem;">${volume}</td>
+                <td style="text-align: center; padding: 0.75rem;">
+                    <button class="btn btn-ghost" onclick="analyzePattaasu('${ticker}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Analyze</button>
+                    <button class="btn btn-ghost" onclick="removeTicker('${ticker}')" style="font-size: 0.75rem; color: var(--danger); padding: 0.25rem;">✕</button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+    }
+
+    function removeTicker(ticker) {
+        const idx = watchlist.indexOf(ticker);
+        if (idx > -1) {
+            watchlist.splice(idx, 1);
+            saveWatchlist();
+            updateWatchlistUI();
+            fetchQuotes();
+        }
+    }
+
+    function analyzePattaasu(ticker) {
+        // Redirect to Dashboard with ticker
+        window.location.href = '/?ticker=' + encodeURIComponent(ticker) + '#analysis';
+    }
+
+    // Market Status
+    async function updateMarketStatus() {
+        try {
+            const res = await fetch('/api/market-status/');
+            const data = await res.json();
+            const el = document.getElementById('market-status-text');
+            if (data.is_open) {
+                el.innerHTML = '🟢 OPEN';
+                el.style.color = 'var(--success)';
+            } else {
+                el.innerHTML = '🔴 CLOSED';
+                el.style.color = 'var(--danger)';
+            }
+        } catch (e) { }
+    }
+    updateMarketStatus();
+    setInterval(updateMarketStatus, 60000);
+
+    // LLM Config Logic
+    async function loadModels() {
+        const provider = document.getElementById('llm-provider').value;
+        const modelSelect = document.getElementById('llm-model');
+        modelSelect.innerHTML = '<option>Loading...</option>';
+        try {
+            const res = await fetch(`/api/config/llm/models/?provider=${provider}`);
+            // Check HTML response
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") === -1) {
+                throw new Error("Received non-JSON response");
+            }
+
+            const data = await res.json();
+            if (data.success && data.models.length > 0) {
+                modelSelect.innerHTML = data.models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+            } else {
+                modelSelect.innerHTML = '<option value="">No models found</option>';
+            }
+        } catch (e) {
+            console.error(e);
+            modelSelect.innerHTML = '<option value="">Error loading</option>';
+        }
+    }
+
+    async function saveLLMConfig() {
+        const provider = document.getElementById('llm-provider').value;
+        const model = document.getElementById('llm-model').value;
+        const msg = document.getElementById('config-msg');
+        msg.textContent = "Saving...";
+        msg.style.color = "gray";
+        try {
+            const res = await fetch('/api/config/llm/save/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, model })
+            });
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") === -1) {
+                throw new Error("Received non-JSON response");
+            }
+            const data = await res.json();
+            if (data.success) {
+                msg.textContent = "Saved to runtime config!";
+                msg.style.color = "var(--success)";
+                setTimeout(() => msg.textContent = "", 2000);
+            } else {
+                msg.textContent = "Error: " + data.error;
+                msg.style.color = "var(--danger)";
+            }
+        } catch (e) {
+            msg.textContent = "Error saving";
+            msg.style.color = "var(--danger)";
+        }
+    }
+
+    document.getElementById('add-ticker').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') addTicker();
+    });
+
+    document.addEventListener('DOMContentLoaded', startMonitor);
+</script>
+{% endblock %}
