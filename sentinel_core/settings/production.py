@@ -6,6 +6,15 @@ from .base import *  # noqa: F401, F403
 # Production specific settings
 DEBUG = False
 
+# IMPORTANT: Change 'YOUR_USERNAME' to your actual PythonAnywhere username
+# Add your Vercel domain when you deploy
+ALLOWED_HOSTS = [
+    'YOUR_USERNAME.pythonanywhere.com',
+    '.vercel.app',  # Allows all Vercel subdomains
+    'localhost',
+    '127.0.0.1'
+]
+
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

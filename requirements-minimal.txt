@@ -1,0 +1,23 @@
+# Core Django
+Django>=5.0
+channels
+django-allauth
+python-dotenv
+
+# Database
+redis
+
+# HTTP Client
+httpx
+aiohttp
+
+# AI Providers (keep only what you use)
+groq
+openai
+
+# Utils
+beautifulsoup4
+tenacity
+tiktoken
+tabulate
+lxml

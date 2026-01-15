@@ -1,0 +1,19 @@
+# Core Django
+Django>=5.0
+django-allauth
+python-dotenv
+
+# HTTP
+httpx
+aiohttp
+requests
+
+# AI (lightweight)
+groq
+openai
+
+# Utils
+beautifulsoup4
+tenacity
+tabulate
+lxml
